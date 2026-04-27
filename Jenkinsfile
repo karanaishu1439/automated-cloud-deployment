@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        IMAGE = "fazil2905/devops-app"
+        IMAGE = "redtag22/devops-app"
         AWS_DEFAULT_REGION = "us-east-1"
     }
 
@@ -10,7 +10,7 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                bat 'docker build -t %IMAGE%:latest .'
+                sh 'docker build -t ${IMAGE}:latest .'
             }
         }
 
@@ -21,10 +21,8 @@ pipeline {
                     usernameVariable: 'DOCKER_USER',
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
-                    bat '''
-                    echo %DOCKER_PASS%>pass.txt
-                    type pass.txt | docker login -u %DOCKER_USER% --password-stdin
-                    del pass.txt
+                    sh '''
+                    echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
                     '''
                 }
             }
@@ -32,7 +30,7 @@ pipeline {
 
         stage('Push Docker Image') {
             steps {
-                bat 'docker push %IMAGE%:latest'
+                sh 'docker push ${IMAGE}:latest'
             }
         }
 
@@ -43,14 +41,14 @@ pipeline {
                     usernameVariable: 'AWS_ACCESS_KEY_ID',
                     passwordVariable: 'AWS_SECRET_ACCESS_KEY'
                 )]) {
-                    bat '''
-                    set AWS_ACCESS_KEY_ID=%AWS_ACCESS_KEY_ID%
-                    set AWS_SECRET_ACCESS_KEY=%AWS_SECRET_ACCESS_KEY%
-                    set AWS_DEFAULT_REGION=%AWS_DEFAULT_REGION%
+                    sh '''
+                    export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                    export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                    export AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION
 
-                    aws ecs update-service ^
-                    --cluster devops-cluster ^
-                    --service devops-service ^
+                    aws ecs update-service \
+                    --cluster devops-cluster \
+                    --service devops-service \
                     --force-new-deployment
                     '''
                 }
@@ -63,7 +61,7 @@ pipeline {
             }
             steps {
                 dir('terraform') {
-                    bat 'terraform init'
+                    sh 'terraform init'
                 }
             }
         }
@@ -79,10 +77,11 @@ pipeline {
                     passwordVariable: 'AWS_SECRET_ACCESS_KEY'
                 )]) {
                     dir('terraform') {
-                        bat '''
-                        set AWS_ACCESS_KEY_ID=%AWS_ACCESS_KEY_ID%
-                        set AWS_SECRET_ACCESS_KEY=%AWS_SECRET_ACCESS_KEY%
-                        set AWS_DEFAULT_REGION=%AWS_DEFAULT_REGION%
+                        sh '''
+                        export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                        export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                        export AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION
+
                         terraform apply -auto-approve
                         '''
                     }
