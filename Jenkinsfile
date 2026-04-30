@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        IMAGE = "fazil2905/devops-app"
+        IMAGE = "redtag22/devops-app"
         AWS_DEFAULT_REGION = "us-east-1"
     }
 
