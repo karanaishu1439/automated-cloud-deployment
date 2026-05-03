@@ -8,6 +8,33 @@ pipeline {
 
     stages {
 
+        stage('Terraform Init') {
+            steps {
+                dir('terraform') {
+                    sh 'terraform init'
+                }
+            }
+        }
+
+        stage('Terraform Apply (Deploy to ECS)') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'aws-creds',
+                    usernameVariable: 'AWS_ACCESS_KEY_ID',
+                    passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                )]) {
+                    dir('terraform') {
+                        sh '''
+                        export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                        export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                        export AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION
+                        terraform apply -auto-approve
+                        '''
+                    }
+                }
+            }
+        }
+
         stage('Build Docker Image') {
             steps {
                 sh 'docker build -t $IMAGE:latest .'
@@ -22,9 +49,7 @@ pipeline {
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
                     sh '''
-                    echo "$DOCKER_PASS" > pass.txt
-                    cat pass.txt | docker login -u "$DOCKER_USER" --password-stdin
-                    rm -f pass.txt
+                    echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
                     '''
                 }
             }
@@ -51,41 +76,8 @@ pipeline {
                     aws ecs update-service \
                     --cluster devops-cluster \
                     --service devops-service \
-                    --force-new-deployment
+                    --force-new-deployment || true
                     '''
-                }
-            }
-        }
-
-        stage('Terraform Init') {
-            when {
-                changeset "terraform/**"
-            }
-            steps {
-                dir('terraform') {
-                    sh 'terraform init'
-                }
-            }
-        }
-
-        stage('Terraform Apply (Deploy to ECS)') {
-            when {
-                changeset "terraform/**"
-            }
-            steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'aws-creds',
-                    usernameVariable: 'AWS_ACCESS_KEY_ID',
-                    passwordVariable: 'AWS_SECRET_ACCESS_KEY'
-                )]) {
-                    dir('terraform') {
-                        sh '''
-                        export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                        export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-                        export AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION
-                        terraform apply -auto-approve
-                        '''
-                    }
                 }
             }
         }
